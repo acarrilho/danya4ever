@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-parchment: #faf7f0;
+    --color-ink: #1c1917;
+    --color-muted: #78716c;
+    --color-border: #e7e0d4;
+    --color-gold: #b89a5c;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-parchment);
+    color: var(--color-ink);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: #e8d9b8;
+    color: var(--color-ink);
+  }
+}
+
+@layer components {
+  .card-message {
+    @apply bg-white/70 backdrop-blur-sm border border-[#e7e0d4] rounded-2xl p-6 transition-all duration-300;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03);
+  }
+
+  .card-message:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.04);
+    transform: translateY(-2px);
+    border-color: #d5c9b5;
+  }
+
+  .input-base {
+    @apply w-full bg-white/80 border border-[#e7e0d4] rounded-xl px-4 py-3 text-sm text-stone-800 placeholder:text-stone-400 transition-all duration-200 outline-none;
+  }
+
+  .input-base:focus {
+    @apply border-[#b89a5c] ring-2 ring-[#b89a5c]/10;
+  }
+
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center gap-2 bg-stone-900 text-ivory-50 text-sm font-medium px-6 py-3 rounded-xl transition-all duration-200 overflow-hidden;
+  }
+
+  .btn-primary:hover {
+    @apply bg-stone-800;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .btn-primary:disabled {
+    @apply opacity-50 cursor-not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+/* Grain texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px;
+  opacity: 0.4;
+}
