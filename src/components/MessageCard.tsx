@@ -17,6 +17,39 @@ function getInitials(name: string): string {
     .join('')
 }
 
+/**
+ * Extract a YouTube video ID from any common YouTube URL format.
+ * Supports: youtu.be/ID, youtube.com/watch?v=ID, youtube.com/embed/ID,
+ *           youtube.com/shorts/ID, youtube.com/live/ID
+ * Returns null if no YouTube URL is found.
+ */
+function extractYouTubeId(text: string): string | null {
+  const patterns = [
+    /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?(?:[^#&]*&)*v=([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/live\/([a-zA-Z0-9_-]{11})/,
+  ]
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match?.[1]) return match[1]
+  }
+  return null
+}
+
+/**
+ * Render message text with the YouTube URL replaced by a placeholder label,
+ * so the embed doesn't duplicate the raw URL in the text.
+ */
+function stripYouTubeUrl(text: string): string {
+  return text
+    .replace(/(?:https?:\/\/)?(?:www\.)?youtu\.be\/[a-zA-Z0-9_-]{11}[^\s]*/g, '')
+    .replace(/(?:https?:\/\/)?(?:www\.)?youtube\.com\/(?:watch|embed|shorts|live)[^\s]*/g, '')
+    .trim()
+    .replace(/\s{2,}/g, ' ')
+}
+
 interface Props {
   message: Message
   index: number
@@ -24,6 +57,8 @@ interface Props {
 
 export default function MessageCard({ message, index }: Props) {
   const initials = getInitials(message.name)
+  const youtubeId = extractYouTubeId(message.content)
+  const displayText = youtubeId ? stripYouTubeUrl(message.content) : message.content
 
   return (
     <article
@@ -53,10 +88,29 @@ export default function MessageCard({ message, index }: Props) {
             </time>
           </div>
 
-          {/* Content */}
-          <p className="text-stone-600 text-sm leading-relaxed font-serif italic">
-            &ldquo;{message.content}&rdquo;
-          </p>
+          {/* Message text — DM Sans for clarity, light warm tone */}
+          {displayText && (
+            <p className="text-stone-600 text-sm leading-relaxed font-sans mb-3">
+              {displayText}
+            </p>
+          )}
+
+          {/* YouTube embed */}
+          {youtubeId && (
+            <div className="mt-1 rounded-xl overflow-hidden border border-[#e7e0d4] bg-black"
+              style={{ aspectRatio: '16/9' }}
+            >
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1`}
+                title="YouTube video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+                className="w-full h-full"
+                style={{ border: 'none', display: 'block' }}
+              />
+            </div>
+          )}
         </div>
       </div>
     </article>
