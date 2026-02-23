@@ -24,7 +24,8 @@ async function importKey(secret: string): Promise<CryptoKey> {
 }
 
 function bufToBase64url(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+  // return btoa(String.fromCharCode(...new Uint8Array(buf)))
+  return btoa(Array.from(new Uint8Array(buf), (b) => String.fromCharCode(b)).join(''))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')
