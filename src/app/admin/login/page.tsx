@@ -1,29 +1,47 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { validateAdminPassword, SESSION_COOKIE, SESSION_VALUE } from '@/lib/admin-auth'
-import { isAdminAuthenticated } from '@/lib/admin-auth'
+import {
+  isAdminAuthenticated,
+  getAdminUserByEmail,
+  verifyPassword,
+  createSessionCookie,
+} from '@/lib/admin-auth'
 
-export default function AdminLoginPage() {
-  if (isAdminAuthenticated()) {
-    redirect('/admin')
-  }
+export default function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: { error?: string }
+}) {
+  if (isAdminAuthenticated()) redirect('/admin')
 
   async function loginAction(formData: FormData) {
     'use server'
+    const email = (formData.get('email') as string)?.trim().toLowerCase()
     const password = formData.get('password') as string
-    if (validateAdminPassword(password)) {
-      cookies().set(SESSION_COOKIE, SESSION_VALUE, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 8, // 8 hours
-        path: '/',
-      })
-      redirect('/admin')
-    } else {
-      redirect('/admin/login?error=1')
+
+    if (!email || !password) redirect('/admin/login?error=missing')
+
+    const user = await getAdminUserByEmail(email)
+
+    if (!user || !user.is_active || !verifyPassword(password, user.password_hash)) {
+      redirect('/admin/login?error=invalid')
     }
+
+    const session = await createSessionCookie(user.id)
+    cookies().set(
+      session.name,
+      session.value,
+      session.options as Parameters<ReturnType<typeof cookies>['set']>[2]
+    )
+    redirect('/admin')
   }
+
+  const errorMsg =
+    searchParams.error === 'invalid'
+      ? 'Invalid email or password.'
+      : searchParams.error === 'missing'
+      ? 'Please enter your email and password.'
+      : null
 
   return (
     <div className="min-h-screen bg-[#faf7f0] flex items-center justify-center px-4">
@@ -43,7 +61,32 @@ export default function AdminLoginPage() {
           <p className="text-stone-400 text-xs mt-1">Memorial Board Moderation</p>
         </div>
 
+        {errorMsg && (
+          <div className="mb-5 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-3 rounded-xl">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="shrink-0">
+              <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M6.5 4v3M6.5 8.5v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            {errorMsg}
+          </div>
+        )}
+
         <form action={loginAction} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-xs font-medium text-stone-500 mb-1.5 tracking-wider uppercase">
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoFocus
+              className="w-full bg-white border border-[#e7e0d4] rounded-xl px-4 py-3 text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:border-[#b89a5c] focus:ring-2 focus:ring-[#b89a5c]/10 transition-all"
+              placeholder="admin@yourdomain.com"
+            />
+          </div>
+
           <div>
             <label htmlFor="password" className="block text-xs font-medium text-stone-500 mb-1.5 tracking-wider uppercase">
               Password
@@ -53,9 +96,8 @@ export default function AdminLoginPage() {
               name="password"
               type="password"
               required
-              autoFocus
               className="w-full bg-white border border-[#e7e0d4] rounded-xl px-4 py-3 text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:border-[#b89a5c] focus:ring-2 focus:ring-[#b89a5c]/10 transition-all"
-              placeholder="Enter admin password"
+              placeholder="••••••••"
             />
           </div>
 

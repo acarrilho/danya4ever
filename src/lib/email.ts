@@ -1,8 +1,10 @@
 import { Resend } from 'resend'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { AdminUser } from '@/lib/types'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-interface NotifyAdminParams {
+interface NotifyApproversParams {
   messageId: string
   name: string
   content: string
@@ -22,18 +24,83 @@ function formatDate(iso: string): string {
   })
 }
 
-export async function sendAdminNotification(params: NotifyAdminParams): Promise<void> {
+/**
+ * Fetch all active admin users from the DB to notify.
+ */
+async function getActiveApprovers(): Promise<AdminUser[]> {
+  const { data, error } = await supabaseAdmin
+    .from('admin_users')
+    .select('id, name, email, is_active, created_at')
+    .eq('is_active', true)
+
+  if (error || !data) return []
+  return data as AdminUser[]
+}
+
+/**
+ * Send one notification email per active approver.
+ * Each email's approve/reject links include the approver's ID so we know
+ * who clicked — enabling "approved_by" tracking without a shared link.
+ *
+ * Any single approver can approve/reject; the first action wins.
+ */
+export async function sendApproverNotifications(params: NotifyApproversParams): Promise<void> {
   const { messageId, name, content, createdAt, moderationToken } = params
   const baseUrl = process.env.APP_BASE_URL ?? 'http://localhost:3000'
-  const adminEmail = process.env.ADMIN_EMAIL
-
-  if (!adminEmail) throw new Error('ADMIN_EMAIL is not set')
-
-  const approveUrl = `${baseUrl}/api/approve?id=${messageId}&token=${moderationToken}`
-  const rejectUrl = `${baseUrl}/api/reject?id=${messageId}&token=${moderationToken}`
   const adminDashboard = `${baseUrl}/admin`
 
-  const html = `
+  const approvers = await getActiveApprovers()
+  if (approvers.length === 0) {
+    console.warn('No active approvers found — skipping email notification.')
+    return
+  }
+
+  await Promise.allSettled(
+    approvers.map((approver) => {
+      const approveUrl =
+        `${baseUrl}/api/approve?id=${messageId}&token=${moderationToken}&approver=${approver.id}`
+      const rejectUrl =
+        `${baseUrl}/api/reject?id=${messageId}&token=${moderationToken}&approver=${approver.id}`
+
+      const html = buildEmailHtml({
+        approverName: approver.name,
+        submitterName: name,
+        content,
+        createdAt,
+        approveUrl,
+        rejectUrl,
+        adminDashboard,
+      })
+
+      return resend.emails.send({
+        from: 'Memorial Board <notifications@yourdomain.com>',
+        to: approver.email,
+        subject: `New memorial message from ${escapeHtml(name)} — awaiting approval`,
+        html,
+      })
+    })
+  )
+}
+
+// ── Kept for backward-compat (single email, e.g. legacy callers) ─────────────
+export async function sendAdminNotification(params: NotifyApproversParams): Promise<void> {
+  return sendApproverNotifications(params)
+}
+
+// ── HTML builder ─────────────────────────────────────────────────────────────
+
+interface EmailHtmlParams {
+  approverName: string
+  submitterName: string
+  content: string
+  createdAt: string
+  approveUrl: string
+  rejectUrl: string
+  adminDashboard: string
+}
+
+function buildEmailHtml(p: EmailHtmlParams): string {
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -46,6 +113,7 @@ export async function sendAdminNotification(params: NotifyAdminParams): Promise<
     .header h1 { color: #faf7f0; font-size: 18px; margin: 0; font-weight: 400; letter-spacing: 0.04em; }
     .header p { color: #b89a5c; font-size: 12px; margin: 6px 0 0; letter-spacing: 0.08em; text-transform: uppercase; }
     .body { padding: 32px; }
+    .greeting { font-size: 13px; color: #78716c; font-family: system-ui, sans-serif; margin-bottom: 20px; }
     .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #78716c; margin-bottom: 4px; font-family: system-ui, sans-serif; }
     .value { font-size: 15px; color: #1c1917; margin-bottom: 20px; }
     .message-box { background: #faf7f0; border: 1px solid #e7e0d4; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
@@ -55,6 +123,7 @@ export async function sendAdminNotification(params: NotifyAdminParams): Promise<
     .btn-approve { background: #166534; color: #fff; }
     .btn-reject { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
     .divider { border: none; border-top: 1px solid #e7e0d4; margin: 24px 0; }
+    .note { font-family: system-ui, sans-serif; font-size: 11px; color: #a8a29e; margin: 0; line-height: 1.6; }
     .footer { font-family: system-ui, sans-serif; font-size: 11px; color: #a8a29e; text-align: center; padding: 0 32px 24px; }
     .footer a { color: #b89a5c; text-decoration: none; }
   </style>
@@ -66,25 +135,28 @@ export async function sendAdminNotification(params: NotifyAdminParams): Promise<
       <p>Awaiting your approval</p>
     </div>
     <div class="body">
+      <p class="greeting">Hello ${escapeHtml(p.approverName)},</p>
+
       <div class="label">From</div>
-      <div class="value">${escapeHtml(name)}</div>
+      <div class="value">${escapeHtml(p.submitterName)}</div>
 
       <div class="label">Submitted</div>
-      <div class="value">${formatDate(createdAt)}</div>
+      <div class="value">${formatDate(p.createdAt)}</div>
 
       <div class="label">Message</div>
       <div class="message-box">
-        <p>${escapeHtml(content)}</p>
+        <p>${escapeHtml(p.content)}</p>
       </div>
 
       <div class="actions">
-        <a href="${approveUrl}" class="btn btn-approve">✓ Approve Message</a>
-        <a href="${rejectUrl}" class="btn btn-reject">✕ Reject Message</a>
+        <a href="${p.approveUrl}" class="btn btn-approve">✓ Approve Message</a>
+        <a href="${p.rejectUrl}" class="btn btn-reject">✕ Reject Message</a>
       </div>
 
       <hr class="divider" />
-      <p style="font-family: system-ui, sans-serif; font-size: 12px; color: #78716c; margin: 0;">
-        Or visit the <a href="${adminDashboard}" style="color: #b89a5c;">admin dashboard</a> to manage all pending messages.
+      <p class="note">
+        Only one approval is needed — the first to act takes effect.
+        Or visit the <a href="${p.adminDashboard}" style="color:#b89a5c;">admin dashboard</a> to manage all pending messages.
       </p>
     </div>
     <div class="footer">
@@ -92,15 +164,7 @@ export async function sendAdminNotification(params: NotifyAdminParams): Promise<
     </div>
   </div>
 </body>
-</html>
-  `.trim()
-
-  await resend.emails.send({
-    from: 'Memorial Board <notifications@yourdomain.com>',
-    to: adminEmail,
-    subject: `New memorial message from ${name} — awaiting approval`,
-    html,
-  })
+</html>`.trim()
 }
 
 function escapeHtml(str: string): string {

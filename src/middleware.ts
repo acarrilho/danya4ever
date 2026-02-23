@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifySessionValue } from '@/lib/session'
 
-export function middleware(req: NextRequest) {
+const SESSION_COOKIE = 'admin_session'
+
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Protect /admin routes (but NOT /admin/login)
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
-    const session = req.cookies.get('admin_session')
-    if (session?.value !== 'authenticated') {
+    const raw = req.cookies.get(SESSION_COOKIE)?.value
+    const adminId = raw ? await verifySessionValue(raw) : null
+    if (!adminId) {
       return NextResponse.redirect(new URL('/admin/login', req.url))
     }
   }
