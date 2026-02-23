@@ -41,7 +41,7 @@ export async function uploadImage(base64DataUri: string): Promise<CloudinaryUplo
   // Use signed upload for security (we have server-side access to the secret)
   const timestamp = Math.floor(Date.now() / 1000).toString()
   const paramsToSign = `folder=danya-memorial&timestamp=${timestamp}`
-  const signature = await signRequest(paramsToSign)
+  const signature = signRequest(paramsToSign)
 
   const signedData = new FormData()
   signedData.append('file', base64DataUri)
@@ -70,7 +70,7 @@ export async function deleteImage(publicId: string): Promise<void> {
 
   const timestamp = Math.floor(Date.now() / 1000).toString()
   const paramsToSign = `public_id=${publicId}&timestamp=${timestamp}`
-  const signature = await signRequest(paramsToSign)
+  const signature = signRequest(paramsToSign)
 
   const formData = new FormData()
   formData.append('public_id', publicId)
@@ -89,19 +89,13 @@ export async function deleteImage(publicId: string): Promise<void> {
 }
 
 /**
- * Generate HMAC-SHA1 signature for Cloudinary signed requests.
- * Uses Web Crypto API so it works in both Node.js and Edge runtimes.
+ * Generate a Cloudinary request signature.
+ * Cloudinary uses plain SHA-1( params_string + api_secret ) — NOT HMAC.
+ * This runs server-side only (API routes), so Node's crypto is available.
  */
-async function signRequest(params: string): Promise<string> {
-  const message = `${params}${API_SECRET}`
-  const enc = new TextEncoder()
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(API_SECRET!),
-    { name: 'HMAC', hash: 'SHA-1' },
-    false,
-    ['sign']
-  )
-  const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(message))
-  return Array.from(new Uint8Array(sigBuf), (b) => b.toString(16).padStart(2, '0')).join('')
+function signRequest(params: string): string {
+  const { createHash } = require('crypto') as typeof import('crypto')
+  return createHash('sha1')
+    .update(`${params}${API_SECRET!}`)
+    .digest('hex')
 }
