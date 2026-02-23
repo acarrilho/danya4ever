@@ -84,3 +84,18 @@ body::before {
   background-size: 128px;
   opacity: 0.4;
 }
+
+/* Form expand/collapse */
+.form-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.form-body.open {
+  grid-template-rows: 1fr;
+}
+
+.form-body > .form-inner {
+  overflow: hidden;
+}

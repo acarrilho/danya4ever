@@ -96,7 +96,7 @@ export async function sendAdminNotification(params: NotifyAdminParams): Promise<
   `.trim()
 
   await resend.emails.send({
-    from: 'Memorial Board <notifications@danya4ever.com>',
+    from: 'Memorial Board <notifications@yourdomain.com>',
     to: adminEmail,
     subject: `New memorial message from ${name} — awaiting approval`,
     html,
