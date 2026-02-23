@@ -24,19 +24,31 @@ async function importKey(secret: string): Promise<CryptoKey> {
 }
 
 function bufToBase64url(buf: ArrayBuffer): string {
-  // return btoa(String.fromCharCode(...new Uint8Array(buf)))
   return btoa(Array.from(new Uint8Array(buf), (b) => String.fromCharCode(b)).join(''))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')
 }
 
-function base64urlToBuf(str: string): Uint8Array {
-  const padded = str.replace(/-/g, '+').replace(/_/g, '/').padEnd(
-    str.length + ((4 - (str.length % 4)) % 4),
-    '='
-  )
-  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))
+/**
+ * Decode a base64url string into a plain ArrayBuffer-backed Uint8Array.
+ * Explicitly typed as Uint8Array<ArrayBuffer> (not ArrayBufferLike) so it
+ * satisfies the BufferSource constraint of crypto.subtle.verify().
+ */
+function base64urlToBytes(str: string): Uint8Array<ArrayBuffer> {
+  const padded = str
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(str.length + ((4 - (str.length % 4)) % 4), '=')
+  const binary = atob(padded)
+  // Allocate a plain ArrayBuffer — never a SharedArrayBuffer — to satisfy
+  // the TypeScript overload that expects ArrayBufferView<ArrayBuffer>.
+  const ab = new ArrayBuffer(binary.length)
+  const view = new Uint8Array(ab)
+  for (let i = 0; i < binary.length; i++) {
+    view[i] = binary.charCodeAt(i)
+  }
+  return view as Uint8Array<ArrayBuffer>
 }
 
 /** Create a signed session value for the given adminUserId. */
@@ -62,7 +74,7 @@ export async function verifySessionValue(raw: string): Promise<string | null> {
   try {
     const key = await importKey(getSecret())
     const enc = new TextEncoder()
-    const sigBuf = base64urlToBuf(sigB64)
+    const sigBuf = base64urlToBytes(sigB64)
     const valid = await crypto.subtle.verify('HMAC', key, sigBuf, enc.encode(adminUserId))
     return valid ? adminUserId : null
   } catch {
