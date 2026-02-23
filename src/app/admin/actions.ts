@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { isAdminAuthenticated, getSessionAdminId, hashPassword, verifyPassword, getAdminUserByEmail } from '@/lib/admin-auth'
+import { isAdminAuthenticated, getSessionAdminId, hashPassword, getAdminUserByEmail } from '@/lib/admin-auth'
+import { deleteImage } from '@/lib/cloudinary'
 
 function requireAuth() {
   if (!isAdminAuthenticated()) throw new Error('Unauthorized')
@@ -41,8 +42,24 @@ export async function rejectMessage(id: string): Promise<{ error?: string }> {
 
 export async function deleteMessage(id: string): Promise<{ error?: string }> {
   requireAuth()
+
+  // Fetch image_public_id before deleting so we can clean up Cloudinary
+  const { data: message } = await supabaseAdmin
+    .from('messages')
+    .select('image_public_id')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabaseAdmin.from('messages').delete().eq('id', id)
   if (error) return { error: error.message }
+
+  // Delete image from Cloudinary after DB record is gone (non-fatal)
+  if (message?.image_public_id) {
+    deleteImage(message.image_public_id).catch((err) =>
+      console.error('Cloudinary cleanup failed:', err)
+    )
+  }
+
   revalidatePath('/admin')
   revalidatePath('/')
   return {}

@@ -7,7 +7,7 @@ import MessageForm from '@/components/MessageForm'
 async function getApprovedMessages(): Promise<{ messages: Message[]; error: string | null }> {
   const { data, error } = await supabase
     .from('messages')
-    .select('id, name, content, status, created_at, approved_at')
+    .select('id, name, content, status, created_at, approved_at, image_url')
     .eq('status', 'approved')
     .order('created_at', { ascending: false })
 

@@ -19,14 +19,11 @@ function getInitials(name: string): string {
 
 /**
  * Extract a YouTube video ID from any common YouTube URL format.
- * Supports: youtu.be/ID, youtube.com/watch?v=ID, youtube.com/embed/ID,
- *           youtube.com/shorts/ID, youtube.com/live/ID
- * Returns null if no YouTube URL is found.
  */
 function extractYouTubeId(text: string): string | null {
   const patterns = [
     /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})/,
-    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?(?:[^#&]*&)*v=([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?(?:[^#&\s]*&)*v=([a-zA-Z0-9_-]{11})/,
     /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
     /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
     /(?:https?:\/\/)?(?:www\.)?youtube\.com\/live\/([a-zA-Z0-9_-]{11})/,
@@ -38,10 +35,7 @@ function extractYouTubeId(text: string): string | null {
   return null
 }
 
-/**
- * Render message text with the YouTube URL replaced by a placeholder label,
- * so the embed doesn't duplicate the raw URL in the text.
- */
+/** Remove YouTube URLs from display text so they don't duplicate the embed. */
 function stripYouTubeUrl(text: string): string {
   return text
     .replace(/(?:https?:\/\/)?(?:www\.)?youtu\.be\/[a-zA-Z0-9_-]{11}[^\s]*/g, '')
@@ -59,6 +53,8 @@ export default function MessageCard({ message, index }: Props) {
   const initials = getInitials(message.name)
   const youtubeId = extractYouTubeId(message.content)
   const displayText = youtubeId ? stripYouTubeUrl(message.content) : message.content
+
+  const hasMedia = !!youtubeId || !!message.image_url
 
   return (
     <article
@@ -80,24 +76,35 @@ export default function MessageCard({ message, index }: Props) {
             <h3 className="font-medium text-stone-800 text-sm tracking-wide truncate">
               {message.name}
             </h3>
-            <time
-              className="shrink-0 text-xs text-stone-400 font-mono"
-              dateTime={message.created_at}
-            >
+            <time className="shrink-0 text-xs text-stone-400 font-mono" dateTime={message.created_at}>
               {formatDate(message.created_at)}
             </time>
           </div>
 
-          {/* Message text — DM Sans for clarity, light warm tone */}
+          {/* Message text */}
           {displayText && (
-            <p className="text-stone-600 text-sm leading-relaxed font-sans mb-3">
+            <p className={`text-stone-600 text-sm leading-relaxed font-sans ${hasMedia ? 'mb-3' : ''}`}>
               {displayText}
             </p>
           )}
 
+          {/* Uploaded image */}
+          {message.image_url && (
+            <div className={`rounded-xl overflow-hidden border border-[#e7e0d4] ${youtubeId ? 'mb-3' : ''}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={message.image_url}
+                alt={`Photo shared by ${message.name}`}
+                className="w-full object-cover max-h-80"
+                loading="lazy"
+              />
+            </div>
+          )}
+
           {/* YouTube embed */}
           {youtubeId && (
-            <div className="mt-1 rounded-xl overflow-hidden border border-[#e7e0d4] bg-black"
+            <div
+              className="rounded-xl overflow-hidden border border-[#e7e0d4] bg-black"
               style={{ aspectRatio: '16/9' }}
             >
               <iframe

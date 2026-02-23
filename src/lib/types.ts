@@ -7,17 +7,21 @@ export interface Message {
   status: MessageStatus
   created_at: string
   approved_at: string | null
-  // approved_by_admin_id is internal — never exposed on the public board
+  image_url: string | null
+  // approved_by_admin_id and image_public_id are internal — never exposed on the public board
 }
 
 export interface MessageInsert {
   name: string
   content: string
+  image_url?: string | null
+  image_public_id?: string | null
 }
 
 export interface AdminMessage extends Message {
   moderation_token: string
   approved_by_admin_id: string | null
+  image_public_id: string | null
 }
 
 // ── Admin users ──────────────────────────────────────────────────────────────
