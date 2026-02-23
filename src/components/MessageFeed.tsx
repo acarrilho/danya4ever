@@ -1,41 +1,28 @@
 'use client'
 
-import { useState } from 'react'
 import MessageCard from './MessageCard'
-import MessageForm from './MessageForm'
 import { Message } from '@/lib/types'
 
 interface Props {
-  initialMessages: Message[]
+  messages: Message[]
 }
 
-export default function MessageFeed({ initialMessages }: Props) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
-
-  function handleMessageAdded(message: Message) {
-    setMessages((prev) => [message, ...prev])
-  }
-
+export default function MessageFeed({ messages }: Props) {
   return (
-    <>
-      <MessageForm onMessageAdded={handleMessageAdded} />
-
-      {/* Feed */}
-      <section aria-label="Memorial messages">
-        {messages.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="space-y-4">
-            <p className="text-xs text-stone-400 text-center mb-6">
-              {messages.length} {messages.length === 1 ? 'message' : 'messages'} of remembrance
-            </p>
-            {messages.map((msg, i) => (
-              <MessageCard key={msg.id} message={msg} index={i} />
-            ))}
-          </div>
-        )}
-      </section>
-    </>
+    <section aria-label="Memorial messages">
+      {messages.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="space-y-4">
+          <p className="text-xs text-stone-400 text-center mb-6">
+            {messages.length} {messages.length === 1 ? 'message' : 'messages'} of remembrance
+          </p>
+          {messages.map((msg, i) => (
+            <MessageCard key={msg.id} message={msg} index={i} />
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 
